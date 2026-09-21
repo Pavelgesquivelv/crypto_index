@@ -1,0 +1,92 @@
+{
+  "1": {
+    "symbol": "BTC",
+    "binance_base": "BTC",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "1027": {
+    "symbol": "ETH",
+    "binance_base": "ETH",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "1839": {
+    "symbol": "BNB",
+    "binance_base": "BNB",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "52": {
+    "symbol": "XRP",
+    "binance_base": "XRP",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "5426": {
+    "symbol": "SOL",
+    "binance_base": "SOL",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "1958": {
+    "symbol": "TRX",
+    "binance_base": "TRX",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "1437": {
+    "symbol": "ZEC",
+    "binance_base": "ZEC",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "32196": {
+    "symbol": "HYPE",
+    "binance_base": "HYPE",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "328": {
+    "symbol": "XMR",
+    "binance_base": "XMR",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "1975": {
+    "symbol": "LINK",
+    "binance_base": "LINK",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "2010": {
+    "symbol": "ADA",
+    "binance_base": "ADA",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "3957": {
+    "symbol": "LEO",
+    "binance_base": "LEO",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "512": {
+    "symbol": "XLM",
+    "binance_base": "XLM",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "6535": {
+    "symbol": "NEAR",
+    "binance_base": "NEAR",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  },
+  "7083": {
+    "symbol": "UNI",
+    "binance_base": "UNI",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-20"
+  }
+}

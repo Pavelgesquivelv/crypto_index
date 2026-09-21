@@ -1,0 +1,11 @@
+.venv/
+.venv-local/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.env
+.env.*
+runs/
+*.log
