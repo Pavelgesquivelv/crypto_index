@@ -16,5 +16,8 @@ crypto-index = "crypto_index.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+crypto_index = ["dashboard.html"]
+
 [project.optional-dependencies]
 reports = ["matplotlib>=3.8,<4"]
