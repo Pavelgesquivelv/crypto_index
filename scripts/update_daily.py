@@ -18,10 +18,37 @@ from crypto_index.calculation import (
     portfolio_value,
     return_pct,
 )
+from crypto_index.portfolio_transition import load_next_portfolio
 
 ROOT = Path("runs/daily")
 ZONE = ZoneInfo("America/Mexico_City")
 
+def advance_portfolio(day, portfolio, portfolio_hash, closing_record):
+    """Select the portfolio valid for a daily valuation."""
+    cutoff = datetime.fromisoformat(
+        portfolio["cutoff_utc"]
+    ).astimezone(ZONE)
+    first_day = cutoff.date() + timedelta(days=1)
+    valid_until = date(
+        first_day.year,
+        first_day.month,
+        calendar.monthrange(first_day.year, first_day.month)[1],
+    )
+
+    if day <= valid_until:
+        return portfolio, portfolio_hash
+
+    if day != valid_until + timedelta(days=1):
+        raise ValueError("No se puede saltar una transición mensual.")
+    if closing_record is None or closing_record["date"] != valid_until.isoformat():
+        raise ValueError("Falta la valoración de cierre para cambiar de cartera.")
+
+    return load_next_portfolio(
+        ROOT / "portfolios",
+        portfolio,
+        portfolio_hash,
+        closing_record,
+    )
 
 def main():
     manifest = json.loads(
@@ -76,6 +103,7 @@ def main():
     latest_date = latest.date()
 
     observations = ROOT / "observations"
+    closing_record = None
 
     # Resume only from a complete, consistent sequence.
     for path in sorted(observations.glob("*.json")):
@@ -86,8 +114,16 @@ def main():
             raise ValueError("Nombre de observación incorrecto.")
         if recorded_date != previous_date + timedelta(days=1):
             raise ValueError("Secuencia diaria incompleta o duplicada.")
-        if recorded_date > valid_until or recorded_date > latest_date:
+        if recorded_date > latest_date:
             raise ValueError("Observación fuera del período permitido.")
+
+        portfolio, portfolio_hash = advance_portfolio(
+            recorded_date, portfolio, portfolio_hash, closing_record
+        )
+        quantities = {
+            p["asset"]: p["quantity"] for p in portfolio["positions"]
+        }
+        pairs = {p["asset"]: p["pair"] for p in portfolio["positions"]}
         if record["portfolio_sha256"] != portfolio_hash:
             raise ValueError("La observación usa otra cartera.")
 
@@ -113,12 +149,20 @@ def main():
 
         previous_date = recorded_date
         previous_value = value
+        closing_record = record
 
-    target = min(latest_date, valid_until)
+    target = latest_date
     created = 0
 
     while previous_date < target:
         day = previous_date + timedelta(days=1)
+        portfolio, portfolio_hash = advance_portfolio(
+            day, portfolio, portfolio_hash, closing_record
+        )
+        quantities = {
+            p["asset"]: p["quantity"] for p in portfolio["positions"]
+        }
+        pairs = {p["asset"]: p["pair"] for p in portfolio["positions"]}
         cutoff = datetime(day.year, day.month, day.day, 7, tzinfo=ZONE)
         start_ms = int(cutoff.timestamp() * 1000)
         prices = {}
@@ -196,15 +240,10 @@ def main():
         previous_date = day
         previous_value = value
         created += 1
+        closing_record = record
 
     print("Observaciones nuevas:", created)
     print("Último corte registrado:", previous_date)
-
-    if latest_date > valid_until:
-        raise SystemExit(
-            f"Actualización detenida: falta incorporar el rebalanceo "
-            f"del {valid_until}. No se usaron cantidades vencidas."
-        )
 
     print("PASS: serie al día hasta la última vela de corte completada.")
 
