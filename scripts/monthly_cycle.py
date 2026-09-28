@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from crypto_index.cli import due
+from crypto_index.schedule import month_end, selection_day, selection_due
 from crypto_index.portfolio_transition import cutoff_date, load_next_portfolio
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -25,13 +25,18 @@ def run(phase, cutoff=None, now=None, execute_step=None):
     now = now or datetime.now(timezone.utc)
     execute_step = execute_step or execute
     local = now.astimezone(ZONE)
-    day = cutoff or local.date().isoformat()
+    day = cutoff or (month_end(local.date()).isoformat() if phase == 'capture' else local.date().isoformat())
     instant = datetime.strptime(day, '%Y-%m-%d').replace(hour=7, tzinfo=ZONE)
     # A missed capture cannot be reconstructed using today's ranking.
-    if phase == 'capture' and (not due(now) or day != local.date().isoformat()):
-        raise ValueError('La captura requiere fin de mes entre 07:00 y 07:14 CDMX.')
+    if phase == 'capture':
+        planned = selection_day(instant.date())
+        if cutoff is None and local.date() != planned:
+            print('Hoy no corresponde seleccionar la muestra; no se consultaron datos.')
+            return {'status': 'not_due'}
+        if not selection_due(now) or local.date() != planned:
+            raise ValueError('La captura requiere el día laborable anterior, entre 07:00 y 07:14 CDMX.')
     cutoff_date({'cutoff_utc': instant.isoformat()})
-    if now < instant:
+    if phase == 'finalize' and now < instant:
         raise ValueError('El corte todavía no ha ocurrido.')
 
     daily = PROJECT / 'runs' / 'daily'
@@ -44,7 +49,7 @@ def run(phase, cutoff=None, now=None, execute_step=None):
     stage = phase
     try:
         if phase == 'capture':
-            execute_step(['-m', 'crypto_index.cli', '--scheduled',
+            execute_step(['-m', 'crypto_index.cli', '--scheduled', '--preselect',
                           '--output', str(selection.parent),
                           '--registry', str(PROJECT / 'config' / 'assets.json')])
         report_path = selection / 'report.json'
@@ -53,6 +58,10 @@ def run(phase, cutoff=None, now=None, execute_step=None):
         report = json.loads(report_path.read_bytes())
         if report.get('status') != 'composition_ready':
             raise ValueError(f"Selección pendiente de revisión: {report.get('status')}")
+        if (report.get('selection_policy') != 'previous_weekday_v1'
+                or report.get('rebalance_date') != day
+                or report.get('selection_date') != selection_day(instant.date()).isoformat()):
+            raise ValueError('La selección no corresponde al día laborable previo de este cierre.')
 
         destination = daily / 'portfolios' / f'portfolio_{day}.json'
         if phase == 'finalize':

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
+from crypto_index.schedule import month_end, selection_day, selection_due
 
 CMC = 'https://pro-api.coinmarketcap.com/public-api/v3/cryptocurrency/listings/latest?start=1&limit=500&convert=USD&sort=market_cap&sort_dir=desc'
 BINANCE = 'https://api.binance.com/api/v3/exchangeInfo'
@@ -132,10 +133,15 @@ def main():
     parser.add_argument('--registry', type=Path, default=Path('config/assets.json'))
     parser.add_argument('--output', type=Path, default=Path('runs'))
     parser.add_argument('--scheduled', action='store_true', help='Only run on month-end, 07:00-07:14 CDMX')
+    parser.add_argument('--preselect', action='store_true',
+                        help='With --scheduled: select on the preceding weekday, 07:00-07:14 CDMX')
     args = parser.parse_args()
+    if args.preselect and not args.scheduled:
+        parser.error('--preselect requires --scheduled')
     now = utcnow()
-    if args.scheduled and not due(now):
-        print('Outside month-end rebalance window; no data fetched.')
+    is_due = selection_due if args.preselect else due
+    if args.scheduled and not is_due(now):
+        print('Outside scheduled selection window; no data fetched.')
         return 0
     run_id = now.astimezone(ZoneInfo('America/Mexico_City')).strftime('%Y-%m') if args.scheduled else now.strftime('%Y%m%dT%H%M%S%fZ')
     target = args.output / run_id
@@ -151,6 +157,8 @@ def main():
         if (target / 'report.json').exists():
             print('Completed run exists; preserving original snapshot.')
             previous = json.loads((target / 'report.json').read_text(encoding='utf-8'))
+            if args.preselect and previous.get('selection_policy') != 'previous_weekday_v1':
+                raise ValueError('Existing snapshot uses another selection policy; preserve and review it')
             return 0 if previous['status'] == 'composition_ready' else 2
         target.mkdir(exist_ok=True)
         raw_registry = args.registry.read_bytes()
@@ -158,13 +166,19 @@ def main():
         cmc_received = utcnow()
         raw_binance = fetch(BINANCE)
         fetched = utcnow()
-        if args.scheduled and not due(fetched):
+        if args.scheduled and (not is_due(fetched) or fetched.astimezone(ZoneInfo('America/Mexico_City')).strftime('%Y-%m') != run_id):
             raise ValueError('Data retrieval exceeded rebalance window')
         if (fetched - cmc_received).total_seconds() > 120:
             raise ValueError('Source captures are too far apart')
         for name, data in [('cmc.json', raw_cmc), ('binance.json', raw_binance), ('registry.json', raw_registry)]:
             (target / name).write_bytes(data)
         report = build(json.loads(raw_cmc), json.loads(raw_binance), json.loads(raw_registry), fetched)
+        if args.preselect:
+            cutoff = month_end(now.astimezone(ZoneInfo('America/Mexico_City')).date())
+            report.update(selection_policy='previous_weekday_v1',
+                          selection_date=selection_day(cutoff).isoformat(),
+                          rebalance_date=cutoff.isoformat(),
+                          business_calendar='Monday-Friday; holidays not excluded')
         report.update(version='0.1.0', generated_utc=fetched.isoformat(), mode='scheduled' if args.scheduled else 'preview',
                       cmc_received_utc=cmc_received.isoformat(), binance_received_utc=fetched.isoformat(),
                       sources={'cmc': CMC, 'binance': BINANCE},

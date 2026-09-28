@@ -47,7 +47,8 @@ class MonthlyCycleTests(unittest.TestCase):
     def run_cycle(self, phase, **kwargs):
         with (patch.object(cycle, 'PROJECT', self.project),
               contextlib.redirect_stdout(io.StringIO())):
-            return cycle.run(phase, now=kwargs.get('now', self.fixture.now),
+            default_now = cycle.datetime.fromisoformat(self.fixture.captured) if phase == 'capture' else self.fixture.now
+            return cycle.run(phase, now=kwargs.get('now', default_now),
                              cutoff=kwargs.get('cutoff'), execute_step=self.execute)
 
     def test_capture_finalize_and_repeat_preserve_portfolio(self):
@@ -82,7 +83,7 @@ class MonthlyCycleTests(unittest.TestCase):
 
     def test_capture_outside_window_does_not_fetch(self):
         with self.assertRaisesRegex(ValueError, 'captura requiere'):
-            self.run_cycle('capture', now=self.fixture.now.replace(hour=14))
+            self.run_cycle('capture', now=self.fixture.now.replace(day=29, hour=14))
         self.assertEqual(self.calls, [])
 
     def test_recovery_uses_saved_selection(self):
@@ -100,6 +101,12 @@ class MonthlyCycleTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.run_cycle('capture')
         self.assertEqual(lock.read_text(), 'another-process')
+
+    def test_daily_timer_skips_other_days_without_creating_files(self):
+        result = self.run_cycle('capture', now=self.fixture.now)
+        self.assertEqual(result, {'status': 'not_due'})
+        self.assertEqual(self.calls, [])
+        self.assertFalse((self.project / 'runs/monthly').exists())
 
     def test_corrupt_seed_blocks_rebalance(self):
         self.run_cycle('capture')

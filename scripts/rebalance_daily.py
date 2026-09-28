@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from crypto_index.archive_download import download_bytes
 from crypto_index.calculation import index_level, number, portfolio_value, rebalance
 from crypto_index.cli import build, timestamp
+from crypto_index.schedule import selection_day
 from crypto_index.portfolio_transition import (
     cutoff_date, load_next_portfolio, positions, reconcile,
 )
@@ -29,10 +30,16 @@ def read_selection(directory, cutoff):
     report = json.loads(raw)
     if report['mode'] != 'scheduled' or report['status'] != 'composition_ready':
         raise ValueError('Se requiere una selección programada y lista.')
+    expected_day = selection_day(cutoff.astimezone(ZONE).date())
+    selection_cutoff = datetime(expected_day.year, expected_day.month, expected_day.day, 7, tzinfo=ZONE)
+    if (report.get('selection_policy') != 'previous_weekday_v1'
+            or report.get('selection_date') != expected_day.isoformat()
+            or report.get('rebalance_date') != cutoff.astimezone(ZONE).date().isoformat()):
+        raise ValueError('La selección no pertenece al día laborable anterior al rebalanceo.')
     generated = timestamp(report['generated_utc'])
     for field in ('generated_utc', 'cmc_received_utc', 'binance_received_utc'):
         captured = timestamp(report[field])
-        if not cutoff <= captured < cutoff + timedelta(minutes=15):
+        if not selection_cutoff <= captured < selection_cutoff + timedelta(minutes=15):
             raise ValueError('Selección fuera de la ventana del corte.')
     cmc_time = timestamp(report['cmc_received_utc'])
     binance_time = timestamp(report['binance_received_utc'])
@@ -131,7 +138,9 @@ def run(root, prior_path, selection, day, now=None, fetch=None):
             'index_level': str(level), 'cash_usdt': str(result['cash']),
             'fees_included': False, 'price_reference': 'Binance Spot 1-minute candle open',
             'selection_method': 'Rebuilt from captured CMC, Binance and reviewed registry',
-            'assumptions': ['Selection captured during 07:00-07:14 CDMX, not exactly at 07:00.',
+            'selection_policy': 'previous_weekday_v1',
+            'selection_date': selection_day(cutoff.date()).isoformat(),
+            'assumptions': ['Selection fixed on the preceding Monday-Friday date, 07:00-07:14 CDMX; holidays not excluded.',
                             'Theoretical fractional portfolio; no fees or slippage; no orders.'],
             'sources': {'prior': {'path': str(prior_path), 'sha256': digest(prior_raw)},
                         'closing': {'path': str(closing_path), 'sha256': digest(closing_raw)},

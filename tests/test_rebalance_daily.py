@@ -23,7 +23,7 @@ class RebalanceDailyTests(unittest.TestCase):
         self.selection.mkdir()
         self.prior = self.root / 'portfolio_seed.json'
         self.now = datetime(2026, 9, 30, 13, 2, tzinfo=timezone.utc)
-        self.captured = '2026-09-30T13:00:20+00:00'
+        self.captured = '2026-09-29T13:00:20+00:00'
         prior = {'cutoff_utc': '2026-08-31T13:00:00+00:00',
                  'initial_value_usdt': '100', 'base_level': '100', 'cash_usdt': '90',
                  'positions': [{'asset': 'BTC', 'pair': 'BTCUSDT', 'quantity': '0.1'}]}
@@ -59,6 +59,8 @@ class RebalanceDailyTests(unittest.TestCase):
                               module.timestamp(self.captured))
         report.update(mode='scheduled', generated_utc=self.captured,
                       cmc_received_utc=self.captured, binance_received_utc=self.captured,
+                      selection_policy='previous_weekday_v1', selection_date='2026-09-29',
+                      rebalance_date='2026-09-30',
                       sha256=hashes)
         (self.selection / 'report.json').write_text(json.dumps(report), encoding='utf-8')
 
@@ -119,7 +121,7 @@ class RebalanceDailyTests(unittest.TestCase):
         self.assert_no_portfolio()
 
     def test_stale_selection(self):
-        self.captured = '2026-09-29T13:00:20+00:00'
+        self.captured = '2026-09-28T13:00:20+00:00'
         for coin in self.cmc['data']:
             coin['last_updated'] = self.captured
         self.save_selection()
@@ -130,6 +132,16 @@ class RebalanceDailyTests(unittest.TestCase):
     def test_uncompleted_minute(self):
         with self.assertRaisesRegex(ValueError, 'completa'):
             self.run_script(now=self.now.replace(minute=0, second=30))
+        self.assertEqual(self.calls, [])
+        self.assert_no_portfolio()
+
+    def test_same_day_selection_cannot_replace_frozen_sample(self):
+        self.captured = '2026-09-30T13:00:20+00:00'
+        for coin in self.cmc['data']:
+            coin['last_updated'] = self.captured
+        self.save_selection()
+        with self.assertRaisesRegex(ValueError, 'ventana'):
+            self.run_script()
         self.assertEqual(self.calls, [])
         self.assert_no_portfolio()
 

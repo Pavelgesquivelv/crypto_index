@@ -46,7 +46,7 @@ class DailyCircuitTests(unittest.TestCase):
             self.assertIn(url, (cli.CMC, cli.BINANCE))
             return json.dumps(fixture.cmc if url == cli.CMC else fixture.exchange).encode()
 
-        args = ['crypto_index.cli', '--scheduled', '--output', str(output),
+        args = ['crypto_index.cli', '--scheduled', '--preselect', '--output', str(output),
                 '--registry', str(fixture.selection / 'registry.json')]
         with (patch('sys.argv', args), patch.object(cli, 'fetch', side_effect=provider),
               patch.object(cli, 'utcnow', return_value=cli.timestamp(fixture.captured)),
