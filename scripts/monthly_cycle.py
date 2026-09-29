@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 from crypto_index.schedule import month_end, selection_day, selection_due
 from crypto_index.portfolio_transition import cutoff_date, load_next_portfolio
+from crypto_index.selection_review import resolve_selection
 
 PROJECT = Path(__file__).resolve().parents[1]
 ZONE = ZoneInfo('America/Mexico_City')
@@ -52,6 +53,8 @@ def run(phase, cutoff=None, now=None, execute_step=None):
             execute_step(['-m', 'crypto_index.cli', '--scheduled', '--preselect',
                           '--output', str(selection.parent),
                           '--registry', str(PROJECT / 'config' / 'assets.json')])
+        if phase == 'finalize':
+            selection = resolve_selection(selection)
         report_path = selection / 'report.json'
         if not report_path.exists():
             raise ValueError('Falta la captura mensual. No se sustituirá por datos actuales.')

@@ -83,6 +83,12 @@
     "classification": "eligible",
     "reviewed_on": "2026-09-20"
   },
+  "1831": {
+    "symbol": "BCH",
+    "binance_base": "BCH",
+    "classification": "eligible",
+    "reviewed_on": "2026-09-29"
+  },
   "7083": {
     "symbol": "UNI",
     "binance_base": "UNI",

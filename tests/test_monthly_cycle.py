@@ -116,6 +116,22 @@ class MonthlyCycleTests(unittest.TestCase):
             self.run_cycle('finalize')
         self.assertFalse((self.daily / 'portfolios').exists())
 
+    def test_finalize_uses_reviewed_snapshot(self):
+        from crypto_index.selection_review import review
+        approved = self.project / 'approved.json'
+        approved.write_text(json.dumps(self.fixture.registry))
+        del self.fixture.registry['1']
+        self.fixture.save_selection()
+        with self.assertRaisesRegex(ValueError, 'pendiente de revisión'):
+            self.run_cycle('capture')
+        original = self.project / 'runs/monthly/selections/2026-09'
+        before = (original / 'report.json').read_bytes()
+        revised = review(original, approved, ['1'])
+        result = self.run_cycle('finalize')
+        self.assertEqual(result['status'], 'portfolio_ready')
+        self.assertEqual(result['selection'], str(revised))
+        self.assertEqual((original / 'report.json').read_bytes(), before)
+
 
 if __name__ == '__main__':
     unittest.main()
